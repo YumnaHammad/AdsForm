@@ -62,14 +62,28 @@ export default function Home() {
   // Fetch form data
   const fetchFormData = async () => {
     if (isUserTypingRef.current) {
+      console.log('[FORM] Skipping fetch - user is typing');
       return;
     }
     try {
-      const response = await fetch('/api/form');
+      console.log('[FORM] Fetching data from MongoDB via /api/form...');
+      const response = await fetch('/api/form', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const result = await response.json();
+      console.log('[FORM] API Response from MongoDB:', result);
       
       if (result.success && result.data) {
         const data = result.data;
+        console.log('[FORM] MongoDB Data Received:', {
+          _id: data._id,
+          initiated_by: data.initiated_by,
+          product: data.product,
+          is_complete: data.is_complete,
+        });
         const incomingData = {
           initiated_by: data.initiated_by || '',
           product: data.product || '',
@@ -112,6 +126,7 @@ export default function Home() {
             }
           });
         }
+        console.log('[FORM] Field updates from MongoDB:', updatedByMap);
         setFieldUpdatedBy(updatedByMap);
 
         // Check locally if all fields are filled
@@ -120,15 +135,23 @@ export default function Home() {
           return fieldValue && fieldValue.trim() !== '';
         });
         
-        setIsComplete(allFieldsFilled || result.isComplete || false);
+        const isFormComplete = allFieldsFilled || result.isComplete || false;
+        console.log('[FORM] Form completion status:', isFormComplete);
+        setIsComplete(isFormComplete);
         
         // Calculate missing fields
         const missing = fields.filter(field => !data[field.key] || data[field.key].trim() === '');
         setMissingFields(missing.map(f => f.label));
         
+        console.log('[FORM] Missing fields:', missing.map(f => f.label));
+        setLoading(false);
+        console.log('[FORM] Data fetch completed successfully');
+      } else {
+        console.warn('[FORM] API response not successful:', result);
         setLoading(false);
       }
     } catch (error) {
+      console.error('[FORM] Error fetching form data from MongoDB:', error);
       setLoading(false);
     }
   };
@@ -196,7 +219,12 @@ export default function Home() {
 
   // Handle field update
   const handleFieldChange = async (fieldName, value) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.warn('[FORM] No current user, skipping field update');
+      return;
+    }
+    
+    console.log('[FORM] Field change detected:', { fieldName, value, currentUser });
  
     // Validate budget
     if (fieldName === 'budget') {
@@ -207,6 +235,7 @@ export default function Home() {
       }));
       
       if (!validation.valid && value.trim() !== '') {
+        console.warn('[FORM] Budget validation failed:', validation.message);
         // Don't update if invalid
         return;
       }
@@ -223,9 +252,11 @@ export default function Home() {
     }, 1200);
 
     pendingFieldsRef.current.add(fieldName);
+    console.log('[FORM] Field marked as pending:', fieldName);
 
     // Update UI immediately for responsive typing
     const updatedData = { ...formData, [fieldName]: value };
+    console.log('[FORM] Updating local state immediately:', { fieldName, value });
     setFormData(updatedData);
     setFieldUpdatedBy((prev) => ({
       ...prev,
@@ -245,7 +276,8 @@ export default function Home() {
     setMissingFields(missing.map(f => f.label));
  
     try {
-      await fetch('/api/form', {
+      console.log('[FORM] Sending update to MongoDB:', { fieldName, value, updatedBy: currentUser });
+      const response = await fetch('/api/form', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,7 +289,16 @@ export default function Home() {
           updatedBy: currentUser,
         }),
       });
+      const result = await response.json();
+      console.log('[FORM] MongoDB update response:', result);
+      
+      if (result.success) {
+        console.log('[FORM] Successfully updated MongoDB:', { fieldName, value });
+      } else {
+        console.error('[FORM] MongoDB update failed:', result);
+      }
     } catch (error) {
+      console.error('[FORM] Error updating field in MongoDB:', error);
       setStatusMessage({
         type: 'error',
         text: 'Failed to update field. Please try again.',
@@ -265,12 +306,14 @@ export default function Home() {
       setTimeout(() => setStatusMessage(null), 3000);
     } finally {
       pendingFieldsRef.current.delete(fieldName);
+      console.log('[FORM] Field update complete, removed from pending');
     }
   };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('[FORM] Form submission started');
 
     // Validate budget
     const budgetValidation = validateBudget(formData.budget);
@@ -297,6 +340,7 @@ export default function Home() {
     }
 
     try {
+      console.log('[FORM] Submitting form to MongoDB...');
       const response = await fetch('/api/form', {
         method: 'POST',
         headers: {
@@ -308,8 +352,10 @@ export default function Home() {
       });
 
       const result = await response.json();
+      console.log('[FORM] Submit response from MongoDB:', result);
       
       if (result.success) {
+        console.log('[FORM] Form submitted successfully to MongoDB');
         setStatusMessage({
           type: 'success',
           text: result.message || 'Form submitted successfully!',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getCurrentEntry, updateField, submitForm, checkIfComplete } from '@/lib/db';
+import { getCurrentEntry, updateField, submitForm, checkIfComplete, resetCurrentEntry } from '@/lib/db';
 
 // GET - Get current form data
 export async function GET() {
@@ -41,6 +41,11 @@ export async function POST(request) {
     if (action === 'submit') {
       const result = await submitForm();
       return NextResponse.json(result);
+    }
+
+    if (action === 'clear') {
+      const entry = await resetCurrentEntry();
+      return NextResponse.json({ success: true, data: entry });
     }
 
     return NextResponse.json(

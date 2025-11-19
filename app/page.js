@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 export default function Home() {
@@ -25,6 +25,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [missingFields, setMissingFields] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [isUserTyping, setIsUserTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const isUserTypingRef = useRef(false);
+  const formDataRef = useRef(formData);
+  const pendingFieldsRef = useRef(new Set());
 
   const fields = [
     { key: 'initiated_by', label: 'Initiated By' },
@@ -54,13 +59,16 @@ export default function Home() {
 
   // Fetch form data
   const fetchFormData = async () => {
+    if (isUserTypingRef.current) {
+      return;
+    }
     try {
       const response = await fetch('/api/form');
       const result = await response.json();
       
       if (result.success && result.data) {
         const data = result.data;
-        setFormData({
+        const incomingData = {
           initiated_by: data.initiated_by || '',
           product: data.product || '',
           agent_name: data.agent_name || '',
@@ -72,7 +80,26 @@ export default function Home() {
           approved_by_operations: data.approved_by_operations || '',
           phone_number: data.phone_number || '',
           approved_by_madam: data.approved_by_madam || '',
+        };
+
+        const pendingFields = pendingFieldsRef.current;
+        const mergedData = { ...incomingData };
+        pendingFields.forEach((pendingField) => {
+          if (mergedData.hasOwnProperty(pendingField)) {
+            mergedData[pendingField] = formDataRef.current?.[pendingField] || '';
+          }
         });
+
+        const isSameData = fields.every(field => {
+          const key = field.key;
+          const currentValue = (formDataRef.current?.[key] || '').trim();
+          const incomingValue = (mergedData[key] || '').trim();
+          return currentValue === incomingValue;
+        });
+
+        if (!isSameData) {
+          setFormData(mergedData);
+        }
 
         // Track who updated each field
         const updatedByMap = {};
@@ -118,6 +145,20 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // Clear typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Keep latest formData in ref for comparison
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+
   // Check if form is complete whenever formData changes
   useEffect(() => {
     const allFieldsFilled = fields.every(field => {
@@ -154,7 +195,7 @@ export default function Home() {
   // Handle field update
   const handleFieldChange = async (fieldName, value) => {
     if (!currentUser) return;
-
+ 
     // Validate budget
     if (fieldName === 'budget') {
       const validation = validateBudget(value);
@@ -168,9 +209,41 @@ export default function Home() {
         return;
       }
     }
+ 
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    setIsUserTyping(true);
+    isUserTypingRef.current = true;
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsUserTyping(false);
+      isUserTypingRef.current = false;
+    }, 1200);
 
+    pendingFieldsRef.current.add(fieldName);
+
+    // Update UI immediately for responsive typing
+    const updatedData = { ...formData, [fieldName]: value };
+    setFormData(updatedData);
+    setFieldUpdatedBy((prev) => ({
+      ...prev,
+      [fieldName]: currentUser,
+    }));
+ 
+    const allFieldsFilled = fields.every(field => {
+      const fieldValue = updatedData[field.key];
+      return fieldValue && fieldValue.trim() !== '';
+    });
+    setIsComplete(allFieldsFilled);
+ 
+    const missing = fields.filter(field => {
+      const fieldValue = updatedData[field.key];
+      return !fieldValue || fieldValue.trim() === '';
+    });
+    setMissingFields(missing.map(f => f.label));
+ 
     try {
-      const response = await fetch('/api/form', {
+      await fetch('/api/form', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,38 +255,14 @@ export default function Home() {
           updatedBy: currentUser,
         }),
       });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        const updatedData = { ...formData, [fieldName]: value };
-        setFormData(updatedData);
-        setFieldUpdatedBy((prev) => ({
-          ...prev,
-          [fieldName]: currentUser,
-        }));
-        
-        // Check locally if all fields are filled
-        const allFieldsFilled = fields.every(field => {
-          const fieldValue = field.key === fieldName ? value : formData[field.key];
-          return fieldValue && fieldValue.trim() !== '';
-        });
-        
-        setIsComplete(allFieldsFilled || result.isComplete || false);
-        
-        // Update missing fields list
-        const missing = fields.filter(field => {
-          const fieldValue = field.key === fieldName ? value : formData[field.key];
-          return !fieldValue || fieldValue.trim() === '';
-        });
-        setMissingFields(missing.map(f => f.label));
-      }
     } catch (error) {
       setStatusMessage({
         type: 'error',
         text: 'Failed to update field. Please try again.',
       });
       setTimeout(() => setStatusMessage(null), 3000);
+    } finally {
+      pendingFieldsRef.current.delete(fieldName);
     }
   };
 
@@ -302,7 +351,7 @@ export default function Home() {
   };
 
   // Handle clear form
-  const handleClearForm = () => {
+  const handleClearForm = async () => {
     setFormData({
       initiated_by: '',
       product: '',
@@ -319,6 +368,39 @@ export default function Home() {
     setFieldUpdatedBy({});
     setIsComplete(false);
     setFieldErrors({});
+    setStatusMessage(null);
+    pendingFieldsRef.current.clear();
+    formDataRef.current = {
+      initiated_by: '',
+      product: '',
+      agent_name: '',
+      team_brand: '',
+      ab_testing: '',
+      budget: '',
+      approved_by_bi: '',
+      approved_by_digital: '',
+      approved_by_operations: '',
+      phone_number: '',
+      approved_by_madam: '',
+    };
+
+    try {
+      await fetch('/api/form', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'clear',
+        }),
+      });
+    } catch (error) {
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to clear form. Please try again.',
+      });
+      setTimeout(() => setStatusMessage(null), 3000);
+    }
   };
 
   if (loading) {

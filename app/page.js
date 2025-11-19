@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function Home() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     initiated_by: '',
     product: '',
@@ -333,6 +335,7 @@ export default function Home() {
           setStatusMessage(null);
           setFieldErrors({});
           fetchFormData();
+          router.push('/records');
         }, 1500);
       } else {
         setStatusMessage({

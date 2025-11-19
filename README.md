@@ -31,7 +31,7 @@ MONGODB_URI=mongodb://localhost:27017/collaborative-form
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Open [http://:3000](http://localhost:3000) in your browser
 
 ## How It Works
 

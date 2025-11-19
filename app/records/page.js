@@ -44,7 +44,12 @@ export default function RecordsPage() {
   const fetchRecords = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/records');
+      const response = await fetch('/api/records', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const result = await response.json();
       
       if (result.success) {

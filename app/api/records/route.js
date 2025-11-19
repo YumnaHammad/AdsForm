@@ -7,7 +7,6 @@ export async function GET() {
     const records = await getAllSubmittedRecords();
     return NextResponse.json({ success: true, data: records });
   } catch (error) {
-    console.error('Error fetching records:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch records' },
       { status: 500 }

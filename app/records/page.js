@@ -7,7 +7,11 @@ export default function RecordsPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [accessLevel, setAccessLevel] = useState('editor'); // Default to editor, no password needed
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [accessLevel, setAccessLevel] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -16,6 +20,11 @@ export default function RecordsPage() {
   const [filterDate, setFilterDate] = useState('');
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
   const [allRecords, setAllRecords] = useState([]);
+
+  const PASSWORDS = {
+    viewer: 'Ads99',
+    editor: 'Edit@01'
+  };
 
   const fields = [
     { key: 'initiated_by', label: 'Initiated By' },
@@ -47,16 +56,45 @@ export default function RecordsPage() {
         setError(result.error || 'Failed to fetch records');
       }
     } catch (err) {
-      console.error('Error fetching records:', err);
       setError('Failed to fetch records');
     } finally {
       setLoading(false);
     }
   };
 
+  // Always require password on mount - don't check sessionStorage
   useEffect(() => {
-    fetchRecords();
+    // Clear any previous authentication
+    sessionStorage.removeItem('recordsAuth');
+    sessionStorage.removeItem('recordsAccessLevel');
+    setIsAuthenticated(false);
+    setAccessLevel(null);
+    setLoading(false);
   }, []);
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (password === PASSWORDS.viewer) {
+      setIsAuthenticated(true);
+      setAccessLevel('viewer');
+      // Store in sessionStorage for current session only
+      sessionStorage.setItem('recordsAuth', 'authenticated');
+      sessionStorage.setItem('recordsAccessLevel', 'viewer');
+      fetchRecords();
+    } else if (password === PASSWORDS.editor) {
+      setIsAuthenticated(true);
+      setAccessLevel('editor');
+      // Store in sessionStorage for current session only
+      sessionStorage.setItem('recordsAuth', 'authenticated');
+      sessionStorage.setItem('recordsAccessLevel', 'editor');
+      fetchRecords();
+    } else {
+      setPasswordError('Incorrect password. Please try again.');
+      setPassword('');
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -99,7 +137,6 @@ export default function RecordsPage() {
         setError(result.error || 'Failed to update record');
       }
     } catch (err) {
-      console.error('Error updating record:', err);
       setError('Failed to update record. Please try again.');
     }
   };
@@ -139,7 +176,6 @@ export default function RecordsPage() {
         setRecordToDelete(null);
       }
     } catch (err) {
-      console.error('Error deleting record:', err);
       setError('Failed to delete record. Please try again.');
       setShowDeleteModal(false);
       setRecordToDelete(null);
@@ -188,6 +224,85 @@ export default function RecordsPage() {
 
     setRecords(filtered);
   }, [allRecords, searchProduct, filterDate, sortOrder]);
+
+  // Show password form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="container">
+        <div className="form-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
+            <Link href="/" style={{ textDecoration: 'none', color: '#ff6b9d', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255, 107, 157, 0.1)', transition: 'all 0.3s ease' }}>
+              ←
+            </Link>
+            <h1 className="form-title" style={{ margin: 0 }}>Access Records</h1>
+          </div>
+          <p style={{ color: '#666', marginTop: '10px', fontSize: '16px' }}>
+            Please enter the password to view records
+          </p>
+        </div>
+
+        <form onSubmit={handlePasswordSubmit} style={{ maxWidth: '400px', margin: '40px auto' }}>
+          <div className="form-field">
+            <label className="form-label">Password</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password..."
+                style={{ 
+                  padding: '12px 45px 12px 16px',
+                  borderBottom: 'none',
+                  borderBottomWidth: 0,
+                  borderBottomStyle: 'none',
+                  borderTop: '2px solid #ffe0e6',
+                  borderLeft: '2px solid #ffe0e6',
+                  borderRight: '2px solid #ffe0e6'
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#ff6b9d',
+                  fontSize: '18px',
+                  padding: '5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '30px',
+                  height: '30px'
+                }}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
+            {passwordError && (
+              <div className="field-error" style={{ marginTop: '8px' }}>
+                {passwordError}
+              </div>
+            )}
+          </div>
+
+          <div className="form-actions" >
+            <button type="submit" className="submit-button">
+              Access Records
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -287,12 +402,6 @@ export default function RecordsPage() {
           )}
         </div>
       </div>
-
-      {error && (
-        <div className="status-message status-error">
-          {error}
-        </div>
-      )}
 
       {records.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>

@@ -7,7 +7,6 @@ export async function GET() {
     const entry = await getCurrentEntry();
     return NextResponse.json({ success: true, data: entry });
   } catch (error) {
-    console.error('Error fetching form:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch form data' },
       { status: 500 }
@@ -49,7 +48,6 @@ export async function POST(request) {
       { status: 400 }
     );
   } catch (error) {
-    console.error('Error updating form:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update form' },
       { status: 500 }

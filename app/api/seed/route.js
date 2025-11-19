@@ -162,7 +162,6 @@ export async function POST() {
       count: inserted.length,
     });
   } catch (error) {
-    console.error('Error seeding data:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to seed data' },
       { status: 500 }

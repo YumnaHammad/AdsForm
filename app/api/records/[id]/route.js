@@ -18,7 +18,6 @@ export async function PUT(request, { params }) {
     
     return NextResponse.json({ success: true, data: updatedRecord });
   } catch (error) {
-    console.error('Error updating record:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update record' },
       { status: 500 }
@@ -42,7 +41,6 @@ export async function DELETE(request, { params }) {
     
     return NextResponse.json({ success: true, message: 'Record deleted successfully' });
   } catch (error) {
-    console.error('Error deleting record:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete record' },
       { status: 500 }

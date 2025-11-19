@@ -100,7 +100,6 @@ export default function Home() {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error fetching form data:', error);
       setLoading(false);
     }
   };
@@ -210,7 +209,6 @@ export default function Home() {
         setMissingFields(missing.map(f => f.label));
       }
     } catch (error) {
-      console.error('Error updating field:', error);
       setStatusMessage({
         type: 'error',
         text: 'Failed to update field. Please try again.',
@@ -295,7 +293,6 @@ export default function Home() {
         setTimeout(() => setStatusMessage(null), 3000);
       }
     } catch (error) {
-      console.error('Error submitting form:', error);
       setStatusMessage({
         type: 'error',
         text: 'Failed to submit form. Please try again.',

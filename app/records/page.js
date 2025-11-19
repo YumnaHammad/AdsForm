@@ -326,10 +326,18 @@ export default function RecordsPage() {
             {accessLevel === 'editor' ? 'Editor' : 'Viewer'}
           </strong>
         </div>
-        <div style={{ marginTop: '20px' }}>
+        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/" className="submit-button" style={{ textDecoration: 'none', display: 'inline-block' }}>
             ← Back to Form
           </Link>
+          <button
+            onClick={fetchRecords}
+            className="submit-button"
+            style={{ fontSize: '15px', padding: '12px 28px' }}
+            title="Refresh records"
+          >
+            🔄 Refresh
+          </button>
         </div>
       </div>
 
@@ -546,8 +554,11 @@ export default function RecordsPage() {
             Showing: <strong>{records.length}</strong> of <strong>{allRecords.length}</strong> records
           </>
         ) : (
-          <>Total Records: <strong>{records.length}</strong></>
+          <>Total Records: <strong>{records.length}</strong> (from database: <strong>{allRecords.length}</strong>)</>
         )}
+        <div style={{ marginTop: '5px', fontSize: '12px', color: '#999' }}>
+          Last updated: {new Date().toLocaleTimeString()}
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}

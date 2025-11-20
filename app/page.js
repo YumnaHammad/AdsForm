@@ -418,12 +418,27 @@ export default function Home() {
       return;
     }
 
-    if (!isComplete) {
+    // Check if all fields are filled, if not, focus on first empty field
+    const emptyFields = fields.filter(field => {
+      const fieldValue = formData[field.key];
+      return !fieldValue || fieldValue.trim() === '';
+    });
+
+    if (emptyFields.length > 0) {
+      // Find first empty field and focus on it
+      const firstEmptyField = emptyFields[0];
+      const emptyInput = inputRefs.current[firstEmptyField.key];
+      
+      if (emptyInput) {
+        emptyInput.focus();
+        emptyInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
       setStatusMessage({
         type: 'error',
-        text: 'Please fill all fields before submitting.',
+        text: `Please fill all fields. Starting with: ${firstEmptyField.label}`,
       });
-      setTimeout(() => setStatusMessage(null), 3000);
+      setTimeout(() => setStatusMessage(null), 4000);
       return;
     }
 
@@ -444,9 +459,11 @@ export default function Home() {
       
       if (result.success) {
         console.log('[FORM] Form submitted successfully to MongoDB');
+        
+        // Show success message
         setStatusMessage({
           type: 'success',
-          text: result.message || 'Form submitted successfully! Redirecting to records...',
+          text: '✅ Form submitted successfully! Record has been added to the table. Redirecting to records...',
         });
         
         // Clear all fields immediately after successful submission
@@ -489,10 +506,10 @@ export default function Home() {
           console.error('[FORM] Error clearing form in database:', error);
         }
         
-        // Redirect to records page after a short delay
+        // Redirect to records page after showing success message
         setTimeout(() => {
           router.push('/records');
-        }, 2000);
+        }, 2500);
       } else {
         setStatusMessage({
           type: 'error',
@@ -664,9 +681,8 @@ export default function Home() {
           <button
             type="submit"
             className="submit-button"
-            disabled={!isComplete}
           >
-            {isComplete ? '✅ Submit Form' : '⏳ Fill All Fields to Submit'}
+            ✅ Submit Form
           </button>
           <button
             type="button"

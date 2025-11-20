@@ -41,6 +41,14 @@ export default function RecordsPage() {
   ];
 
 
+  // Check if a record is blank (all fields empty)
+  const isRecordBlank = (record) => {
+    return fields.every(field => {
+      const value = record[field.key];
+      return !value || value.toString().trim() === '';
+    });
+  };
+
   const fetchRecords = async () => {
     try {
       setLoading(true);
@@ -54,8 +62,15 @@ export default function RecordsPage() {
       
       if (result.success) {
         const fetchedRecords = result.data || [];
-        setAllRecords(fetchedRecords);
-        setRecords(fetchedRecords);
+        // Filter out blank records (records with all empty fields)
+        const nonBlankRecords = fetchedRecords.filter(record => !isRecordBlank(record));
+        console.log('[RECORDS] Filtered blank records:', {
+          total: fetchedRecords.length,
+          nonBlank: nonBlankRecords.length,
+          removed: fetchedRecords.length - nonBlankRecords.length
+        });
+        setAllRecords(nonBlankRecords);
+        setRecords(nonBlankRecords);
         setError(null);
       } else {
         setError(result.error || 'Failed to fetch records');

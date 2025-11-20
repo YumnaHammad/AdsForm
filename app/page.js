@@ -32,6 +32,8 @@ export default function Home() {
   const isUserTypingRef = useRef(false);
   const formDataRef = useRef(formData);
   const pendingFieldsRef = useRef(new Set());
+  const inputRefs = useRef({});
+  const savedFieldsRef = useRef(new Set()); // Track which fields are saved in DB
 
   const fields = [
     { key: 'initiated_by', label: 'Initiated By' },
@@ -99,10 +101,22 @@ export default function Home() {
         };
 
         const pendingFields = pendingFieldsRef.current;
+        const savedFields = savedFieldsRef.current;
         const mergedData = { ...incomingData };
-        pendingFields.forEach((pendingField) => {
-          if (mergedData.hasOwnProperty(pendingField)) {
-            mergedData[pendingField] = formDataRef.current?.[pendingField] || '';
+        
+        // Preserve local unsaved changes (fields that are pending or not yet saved)
+        fields.forEach((field) => {
+          const fieldKey = field.key;
+          const localValue = formDataRef.current?.[fieldKey] || '';
+          const dbValue = mergedData[fieldKey] || '';
+          
+          // If field is pending (being edited) OR not saved yet, keep local value
+          // This ensures unsaved changes are never overwritten by polling
+          if (pendingFields.has(fieldKey) || !savedFields.has(fieldKey)) {
+            if (localValue.trim() !== '') {
+              mergedData[fieldKey] = localValue;
+              console.log('[FORM] Preserving unsaved local change for:', fieldKey, localValue);
+            }
           }
         });
 
@@ -158,13 +172,23 @@ export default function Home() {
 
   // Initial fetch
   useEffect(() => {
-    fetchFormData();
+    fetchFormData().then(() => {
+      // Mark all existing fields as saved after initial fetch
+      fields.forEach(field => {
+        if (formData[field.key] && formData[field.key].trim() !== '') {
+          savedFieldsRef.current.add(field.key);
+        }
+      });
+    });
   }, []);
 
-  // Poll for updates every 2 seconds
+  // Poll for updates every 2 seconds (only updates fields that are saved in DB)
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchFormData();
+      // Only fetch if user is not actively typing
+      if (!isUserTypingRef.current) {
+        fetchFormData();
+      }
     }, 2000);
 
     return () => clearInterval(interval);
@@ -186,18 +210,31 @@ export default function Home() {
 
   // Check if form is complete whenever formData changes
   useEffect(() => {
-    const allFieldsFilled = fields.every(field => {
+    const fieldStatus = fields.map(field => {
       const fieldValue = formData[field.key];
-      return fieldValue && fieldValue.trim() !== '';
+      const isFilled = fieldValue && fieldValue.trim() !== '';
+      return { key: field.key, label: field.label, value: fieldValue, isFilled };
     });
+    
+    const allFieldsFilled = fieldStatus.every(f => f.isFilled);
+    
+    console.log('[FORM] Form completion check:', {
+      allFieldsFilled,
+      fieldStatus,
+      isCompleteState: isComplete,
+    });
+    
     setIsComplete(allFieldsFilled);
     
     // Update missing fields
-    const missing = fields.filter(field => {
-      const fieldValue = formData[field.key];
-      return !fieldValue || fieldValue.trim() === '';
-    });
+    const missing = fieldStatus.filter(f => !f.isFilled);
     setMissingFields(missing.map(f => f.label));
+    
+    if (missing.length > 0) {
+      console.log('[FORM] Missing fields preventing submission:', missing.map(f => `${f.label} (${f.key}): "${f.value}"`));
+    } else {
+      console.log('[FORM] ✅ All fields filled! Submit button should be enabled.');
+    }
   }, [formData]);
 
   // Validate budget (numbers only)
@@ -217,14 +254,9 @@ export default function Home() {
     return { valid: true, message: '' };
   };
 
-  // Handle field update
-  const handleFieldChange = async (fieldName, value) => {
-    if (!currentUser) {
-      console.warn('[FORM] No current user, skipping field update');
-      return;
-    }
-    
-    console.log('[FORM] Field change detected:', { fieldName, value, currentUser });
+  // Handle field change (only local state, no database save)
+  const handleFieldChange = (fieldName, value) => {
+    console.log('[FORM] Field change detected (local only, NOT saved to DB):', { fieldName, value });
  
     // Validate budget
     if (fieldName === 'budget') {
@@ -240,43 +272,70 @@ export default function Home() {
         return;
       }
     }
- 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    setIsUserTyping(true);
-    isUserTypingRef.current = true;
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsUserTyping(false);
-      isUserTypingRef.current = false;
-    }, 1200);
 
+    // Mark field as not saved (remove from saved set if it was there)
+    savedFieldsRef.current.delete(fieldName);
+    
+    // Mark field as pending (being edited)
     pendingFieldsRef.current.add(fieldName);
-    console.log('[FORM] Field marked as pending:', fieldName);
 
     // Update UI immediately for responsive typing
     const updatedData = { ...formData, [fieldName]: value };
-    console.log('[FORM] Updating local state immediately:', { fieldName, value });
+    console.log('[FORM] Updating local state only (NOT in database):', { fieldName, value });
     setFormData(updatedData);
-    setFieldUpdatedBy((prev) => ({
-      ...prev,
-      [fieldName]: currentUser,
-    }));
  
     const allFieldsFilled = fields.every(field => {
       const fieldValue = updatedData[field.key];
-      return fieldValue && fieldValue.trim() !== '';
+      const isFilled = fieldValue && fieldValue.trim() !== '';
+      return isFilled;
     });
+    
+    console.log('[FORM] Field change - completion check:', {
+      allFieldsFilled,
+      fieldName,
+      value,
+    });
+    
     setIsComplete(allFieldsFilled);
- 
+
     const missing = fields.filter(field => {
       const fieldValue = updatedData[field.key];
       return !fieldValue || fieldValue.trim() === '';
     });
     setMissingFields(missing.map(f => f.label));
- 
+  };
+
+  // Handle save field to database (when + icon is clicked)
+  const handleSaveField = async (fieldName, value) => {
+    if (!currentUser) {
+      console.warn('[FORM] No current user, skipping field save');
+      setStatusMessage({
+        type: 'error',
+        text: 'Please wait for user initialization.',
+      });
+      setTimeout(() => setStatusMessage(null), 3000);
+      return;
+    }
+
+    // Validate budget before saving
+    if (fieldName === 'budget') {
+      const validation = validateBudget(value);
+      if (!validation.valid && value.trim() !== '') {
+        setFieldErrors(prev => ({
+          ...prev,
+          [fieldName]: validation.message
+        }));
+        setStatusMessage({
+          type: 'error',
+          text: 'Please enter a valid budget before saving.',
+        });
+        setTimeout(() => setStatusMessage(null), 3000);
+        return;
+      }
+    }
+
     try {
-      console.log('[FORM] Sending update to MongoDB:', { fieldName, value, updatedBy: currentUser });
+      console.log('[FORM] Saving field to MongoDB:', { fieldName, value, updatedBy: currentUser });
       const response = await fetch('/api/form', {
         method: 'POST',
         headers: {
@@ -290,23 +349,52 @@ export default function Home() {
         }),
       });
       const result = await response.json();
-      console.log('[FORM] MongoDB update response:', result);
+      console.log('[FORM] MongoDB save response:', result);
       
       if (result.success) {
-        console.log('[FORM] Successfully updated MongoDB:', { fieldName, value });
+        console.log('[FORM] Successfully saved to MongoDB:', { fieldName, value });
+        
+        // Mark field as saved in database
+        savedFieldsRef.current.add(fieldName);
+        
+        setFieldUpdatedBy((prev) => ({
+          ...prev,
+          [fieldName]: currentUser,
+        }));
+        
+        // Show success message briefly
+        setStatusMessage({
+          type: 'success',
+          text: `${fields.find(f => f.key === fieldName)?.label} saved successfully!`,
+        });
+        setTimeout(() => setStatusMessage(null), 2000);
+
+        // Auto-focus next field
+        const currentIndex = fields.findIndex(f => f.key === fieldName);
+        if (currentIndex < fields.length - 1) {
+          const nextField = fields[currentIndex + 1];
+          const nextInput = inputRefs.current[nextField.key];
+          if (nextInput) {
+            setTimeout(() => {
+              nextInput.focus();
+            }, 100);
+          }
+        }
       } else {
-        console.error('[FORM] MongoDB update failed:', result);
+        console.error('[FORM] MongoDB save failed:', result);
+        setStatusMessage({
+          type: 'error',
+          text: 'Failed to save field. Please try again.',
+        });
+        setTimeout(() => setStatusMessage(null), 3000);
       }
     } catch (error) {
-      console.error('[FORM] Error updating field in MongoDB:', error);
+      console.error('[FORM] Error saving field to MongoDB:', error);
       setStatusMessage({
         type: 'error',
-        text: 'Failed to update field. Please try again.',
+        text: 'Failed to save field. Please try again.',
       });
       setTimeout(() => setStatusMessage(null), 3000);
-    } finally {
-      pendingFieldsRef.current.delete(fieldName);
-      console.log('[FORM] Field update complete, removed from pending');
     }
   };
 
@@ -358,31 +446,53 @@ export default function Home() {
         console.log('[FORM] Form submitted successfully to MongoDB');
         setStatusMessage({
           type: 'success',
-          text: result.message || 'Form submitted successfully!',
+          text: result.message || 'Form submitted successfully! Redirecting to records...',
         });
         
-        // Reset form after submission
-        setTimeout(() => {
-          setFormData({
-            initiated_by: '',
-            product: '',
-            agent_name: '',
-            team_brand: '',
-            ab_testing: '',
-            budget: '',
-            approved_by_bi: '',
-            approved_by_digital: '',
-            approved_by_operations: '',
-            phone_number: '',
-            approved_by_madam: '',
+        // Clear all fields immediately after successful submission
+        const emptyFormData = {
+          initiated_by: '',
+          product: '',
+          agent_name: '',
+          team_brand: '',
+          ab_testing: '',
+          budget: '',
+          approved_by_bi: '',
+          approved_by_digital: '',
+          approved_by_operations: '',
+          phone_number: '',
+          approved_by_madam: '',
+        };
+        
+        console.log('[FORM] Clearing all form fields...');
+        setFormData(emptyFormData);
+        formDataRef.current = emptyFormData;
+        setFieldUpdatedBy({});
+        setIsComplete(false);
+        setFieldErrors({});
+        pendingFieldsRef.current.clear();
+        savedFieldsRef.current.clear();
+        
+        // Clear the form in database
+        try {
+          await fetch('/api/form', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'clear',
+            }),
           });
-          setFieldUpdatedBy({});
-          setIsComplete(false);
-          setStatusMessage(null);
-          setFieldErrors({});
-          fetchFormData();
+          console.log('[FORM] Form cleared in database');
+        } catch (error) {
+          console.error('[FORM] Error clearing form in database:', error);
+        }
+        
+        // Redirect to records page after a short delay
+        setTimeout(() => {
           router.push('/records');
-        }, 1500);
+        }, 2000);
       } else {
         setStatusMessage({
           type: 'error',
@@ -485,39 +595,62 @@ export default function Home() {
                 {field.label}
                 <span className="required">*</span>
               </label>
-              <input
-                type={field.key === 'budget' ? 'number' : field.key === 'phone_number' ? 'tel' : 'text'}
-                className={`form-input ${fieldErrors[field.key] ? 'form-input-error' : ''}`}
-                value={formData[field.key]}
-                onChange={(e) => {
-                  let value = e.target.value;
-                  
-                  // For budget, only allow numbers
-                  if (field.key === 'budget') {
-                    value = value.replace(/[^\d]/g, '');
-                  }
-                  
-                  // For phone number, allow only 11 digits
-                  if (field.key === 'phone_number') {
-                    value = value.replace(/[^\d]/g, ''); // Remove all non-digits
-                    if (value.length > 11) {
-                      value = value.slice(0, 11); // Limit to 11 digits
+              <div className="input-with-save">
+                <input
+                  ref={(el) => (inputRefs.current[field.key] = el)}
+                  type={field.key === 'budget' ? 'number' : field.key === 'phone_number' ? 'tel' : 'text'}
+                  className={`form-input ${fieldErrors[field.key] ? 'form-input-error' : ''}`}
+                  value={formData[field.key]}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    
+                    // For budget, only allow numbers
+                    if (field.key === 'budget') {
+                      value = value.replace(/[^\d]/g, '');
                     }
+                    
+                    // For phone number, allow only 11 digits
+                    if (field.key === 'phone_number') {
+                      value = value.replace(/[^\d]/g, ''); // Remove all non-digits
+                      if (value.length > 11) {
+                        value = value.slice(0, 11); // Limit to 11 digits
+                      }
+                    }
+                    
+                    handleFieldChange(field.key, value);
+                  }}
+                  onKeyDown={(e) => {
+                    // Allow Tab key to move to next field
+                    if (e.key === 'Tab') {
+                      // Default behavior is fine
+                    }
+                    // Allow Enter key to save and move to next
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveField(field.key, formData[field.key]);
+                    }
+                  }}
+                  placeholder={
+                    field.key === 'budget' 
+                      ? 'Enter amount (numbers only)' 
+                      : field.key === 'phone_number'
+                      ? 'Enter 11 digits'
+                      : 'Type your answer here...'
                   }
-                  
-                  handleFieldChange(field.key, value);
-                }}
-                placeholder={
-                  field.key === 'budget' 
-                    ? 'Enter amount (numbers only)' 
-                    : field.key === 'phone_number'
-                    ? 'Enter 11 digits'
-                    : 'Type your answer here...'
-                }
-                maxLength={field.key === 'phone_number' ? 11 : undefined}
-                min={field.key === 'budget' ? '0' : undefined}
-                step={field.key === 'budget' ? '1' : undefined}
-              />
+                  maxLength={field.key === 'phone_number' ? 11 : undefined}
+                  min={field.key === 'budget' ? '0' : undefined}
+                  step={field.key === 'budget' ? '1' : undefined}
+                  style={{ paddingRight: '50px' }}
+                />
+                <button
+                  type="button"
+                  className="save-field-button"
+                  onClick={() => handleSaveField(field.key, formData[field.key])}
+                  title="Save and move to next field"
+                >
+                  +
+                </button>
+              </div>
               {fieldErrors[field.key] && (
                 <div className="field-error">
                   {fieldErrors[field.key]}

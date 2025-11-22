@@ -1,12 +1,18 @@
-import { NextResponse } from 'next/server';
-import { getCurrentEntry, updateField, submitForm, checkIfComplete, resetCurrentEntry } from '@/lib/db';
+import { NextResponse } from "next/server";
+import {
+  getCurrentEntry,
+  updateField,
+  submitForm,
+  checkIfComplete,
+  resetCurrentEntry,
+} from "@/lib/db";
 
 // GET - Get current form data
 export async function GET() {
   try {
-    console.log('[API] GET /api/form - Fetching from MongoDB...');
+    console.log("[API] GET /api/form - Fetching from MongoDB...");
     const entry = await getCurrentEntry();
-    console.log('[API] MongoDB entry fetched:', {
+    console.log("[API] MongoDB entry fetched:", {
       _id: entry._id,
       is_complete: entry.is_complete,
       initiated_by: entry.initiated_by,
@@ -16,16 +22,17 @@ export async function GET() {
       { success: true, data: entry },
       {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       }
     );
   } catch (error) {
-    console.error('[API] Error fetching form data from MongoDB:', error);
+    console.error("[API] Error fetching form data from MongoDB:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch form data' },
+      { success: false, error: "Failed to fetch form data" },
       { status: 500 }
     );
   }
@@ -36,21 +43,32 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { action, fieldName, value, updatedBy } = body;
-    console.log('[API] POST /api/form - Action:', action, { fieldName, value, updatedBy });
+    console.log("[API] POST /api/form - Action:", action, {
+      fieldName,
+      value,
+      updatedBy,
+    });
 
-    if (action === 'update') {
+    if (action === "update") {
       if (!fieldName || !updatedBy) {
-        console.error('[API] Missing required fields:', { fieldName, updatedBy });
+        console.error("[API] Missing required fields:", {
+          fieldName,
+          updatedBy,
+        });
         return NextResponse.json(
-          { success: false, error: 'Field name and updated by are required' },
+          { success: false, error: "Field name and updated by are required" },
           { status: 400 }
         );
       }
 
-      console.log('[API] Updating field in MongoDB:', { fieldName, value, updatedBy });
-      const entry = await updateField(fieldName, value || '', updatedBy);
+      console.log("[API] Updating field in MongoDB:", {
+        fieldName,
+        value,
+        updatedBy,
+      });
+      const entry = await updateField(fieldName, value || "", updatedBy);
       const isComplete = checkIfComplete(entry);
-      console.log('[API] Field updated in MongoDB:', {
+      console.log("[API] Field updated in MongoDB:", {
         _id: entry._id,
         fieldName,
         newValue: entry[fieldName],
@@ -64,25 +82,59 @@ export async function POST(request) {
       });
     }
 
-    if (action === 'submit') {
+    if (action === "submit") {
       const result = await submitForm();
       return NextResponse.json(result);
     }
 
-    if (action === 'clear') {
+    if (action === "complete") {
+      console.log(
+        "[API] Completing form - marking as complete and creating new document"
+      );
+
+      // Get current entry first
+      const currentEntry = await getCurrentEntry();
+      console.log("[API] Current entry before completion:", {
+        _id: currentEntry._id,
+        is_complete: currentEntry.is_complete,
+      });
+
+      // Mark current entry as complete
+      const completedEntry = await updateField("is_complete", "true", "system");
+      console.log("[API] Entry marked as complete:", {
+        _id: completedEntry._id,
+        is_complete: completedEntry.is_complete,
+      });
+
+      // Create a new empty entry for the next form
+      const newEntry = await resetCurrentEntry();
+      console.log("[API] New empty entry created:", {
+        _id: newEntry._id,
+        is_complete: newEntry.is_complete,
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: newEntry,
+        completedEntry: completedEntry,
+        message: "Form completed successfully and new form created",
+      });
+    }
+
+    if (action === "clear") {
       const entry = await resetCurrentEntry();
       return NextResponse.json({ success: true, data: entry });
     }
 
     return NextResponse.json(
-      { success: false, error: 'Invalid action' },
+      { success: false, error: "Invalid action" },
       { status: 400 }
     );
   } catch (error) {
+    console.error("[API] Error in POST /api/form:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update form' },
+      { success: false, error: "Failed to update form" },
       { status: 500 }
     );
   }
 }
-

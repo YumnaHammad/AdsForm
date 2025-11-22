@@ -1,82 +1,89 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 export default function RecordsPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [accessLevel, setAccessLevel] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState(null);
-  const [searchProduct, setSearchProduct] = useState('');
-  const [filterDate, setFilterDate] = useState('');
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
+  const [searchProduct, setSearchProduct] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest"); // 'newest' or 'oldest'
   const [allRecords, setAllRecords] = useState([]);
 
   const PASSWORDS = {
-    viewer: 'Ads99',
-    editor: 'Edit@01'
+    viewer: "Ads99",
+    editor: "Edit@01",
   };
 
   const fields = [
-    { key: 'initiated_by', label: 'Initiated By' },
-    { key: 'product', label: 'Product' },
-    { key: 'agent_name', label: 'Agent Name' },
-    { key: 'team_brand', label: 'Team / Brand' },
-    { key: 'ab_testing', label: 'AB Testing' },
-    { key: 'budget', label: 'Budget' },
-    { key: 'approved_by_bi', label: 'Approved By BI' },
-    { key: 'approved_by_digital', label: 'Approved By Digital' },
-    { key: 'approved_by_operations', label: 'Approved By Operations' },
-    { key: 'phone_number', label: 'Phone Number' },
-    { key: 'approved_by_madam', label: 'Approved By Madam' },
+    { key: "initiated_by", label: "Initiated By" },
+    { key: "product", label: "Product" },
+    { key: "agent_name", label: "Agent Name" },
+    { key: "team_brand", label: "Team / Brand" },
+    { key: "ab_testing", label: "AB Testing" },
+    { key: "budget", label: "Budget" },
+    { key: "approved_by_bi", label: "Approved By BI" },
+    { key: "approved_by_digital", label: "Approved By Digital" },
+    { key: "approved_by_operations", label: "Approved By Operations" },
+    { key: "phone_number", label: "Phone Number" },
+    { key: "approved_by_madam", label: "Approved By Madam" },
   ];
-
 
   // Check if a record is blank (all fields empty)
   const isRecordBlank = (record) => {
-    return fields.every(field => {
+    return fields.every((field) => {
       const value = record[field.key];
-      return !value || value.toString().trim() === '';
+      return !value || value.toString().trim() === "";
     });
   };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
   const fetchRecords = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/records', {
-        cache: 'no-store',
+      const response = await fetch("/api/records", {
+        cache: "no-store",
         headers: {
-          'Cache-Control': 'no-cache',
+          "Cache-Control": "no-cache",
         },
       });
       const result = await response.json();
-      
+
       if (result.success) {
         const fetchedRecords = result.data || [];
+        console.log("fetched record are ", fetchRecords);
+
         // Filter out blank records (records with all empty fields)
-        const nonBlankRecords = fetchedRecords.filter(record => !isRecordBlank(record));
-        console.log('[RECORDS] Filtered blank records:', {
+        const nonBlankRecords = fetchedRecords.filter(
+          (record) => !isRecordBlank(record)
+        );
+        console.log("[RECORDS] Filtered blank records:", {
           total: fetchedRecords.length,
           nonBlank: nonBlankRecords.length,
-          removed: fetchedRecords.length - nonBlankRecords.length
+          removed: fetchedRecords.length - nonBlankRecords.length,
         });
-        setAllRecords(nonBlankRecords);
-        setRecords(nonBlankRecords);
+        setAllRecords(fetchedRecords);
+        setRecords(fetchedRecords);
         setError(null);
       } else {
-        setError(result.error || 'Failed to fetch records');
+        setError(result.error || "Failed to fetch records");
       }
     } catch (err) {
-      setError('Failed to fetch records');
+      setError("Failed to fetch records");
     } finally {
       setLoading(false);
     }
@@ -85,8 +92,8 @@ export default function RecordsPage() {
   // Always require password on mount - don't check sessionStorage
   useEffect(() => {
     // Clear any previous authentication
-    sessionStorage.removeItem('recordsAuth');
-    sessionStorage.removeItem('recordsAccessLevel');
+    sessionStorage.removeItem("recordsAuth");
+    sessionStorage.removeItem("recordsAccessLevel");
     setIsAuthenticated(false);
     setAccessLevel(null);
     setLoading(false);
@@ -94,30 +101,30 @@ export default function RecordsPage() {
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    setPasswordError('');
+    setPasswordError("");
 
     if (password === PASSWORDS.viewer) {
       setIsAuthenticated(true);
-      setAccessLevel('viewer');
+      setAccessLevel("viewer");
       // Store in sessionStorage for current session only
-      sessionStorage.setItem('recordsAuth', 'authenticated');
-      sessionStorage.setItem('recordsAccessLevel', 'viewer');
+      sessionStorage.setItem("recordsAuth", "authenticated");
+      sessionStorage.setItem("recordsAccessLevel", "viewer");
       fetchRecords();
     } else if (password === PASSWORDS.editor) {
       setIsAuthenticated(true);
-      setAccessLevel('editor');
+      setAccessLevel("editor");
       // Store in sessionStorage for current session only
-      sessionStorage.setItem('recordsAuth', 'authenticated');
-      sessionStorage.setItem('recordsAccessLevel', 'editor');
+      sessionStorage.setItem("recordsAuth", "authenticated");
+      sessionStorage.setItem("recordsAccessLevel", "editor");
       fetchRecords();
     } else {
-      setPasswordError('Incorrect password. Please try again.');
-      setPassword('');
+      setPasswordError("Incorrect password. Please try again.");
+      setPassword("");
     }
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
     return date.toLocaleString();
   };
@@ -135,18 +142,18 @@ export default function RecordsPage() {
   const handleSaveEdit = async (recordId) => {
     try {
       const response = await fetch(`/api/records/${recordId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(editFormData),
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // Update local records
-        const updatedRecords = records.map(record => 
+        const updatedRecords = records.map((record) =>
           record._id === recordId ? result.data : record
         );
         setRecords(updatedRecords);
@@ -154,17 +161,17 @@ export default function RecordsPage() {
         setEditFormData({});
         setError(null);
       } else {
-        setError(result.error || 'Failed to update record');
+        setError(result.error || "Failed to update record");
       }
     } catch (err) {
-      setError('Failed to update record. Please try again.');
+      setError("Failed to update record. Please try again.");
     }
   };
 
   const handleEditFieldChange = (field, value) => {
-    setEditFormData(prev => ({
+    setEditFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -178,25 +185,27 @@ export default function RecordsPage() {
 
     try {
       const response = await fetch(`/api/records/${recordToDelete}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
         // Remove from local records
-        const updatedRecords = records.filter(record => record._id !== recordToDelete);
+        const updatedRecords = records.filter(
+          (record) => record._id !== recordToDelete
+        );
         setRecords(updatedRecords);
         setError(null);
         setShowDeleteModal(false);
         setRecordToDelete(null);
       } else {
-        setError(result.error || 'Failed to delete record');
+        setError(result.error || "Failed to delete record");
         setShowDeleteModal(false);
         setRecordToDelete(null);
       }
     } catch (err) {
-      setError('Failed to delete record. Please try again.');
+      setError("Failed to delete record. Please try again.");
       setShowDeleteModal(false);
       setRecordToDelete(null);
     }
@@ -212,15 +221,15 @@ export default function RecordsPage() {
     let filtered = [...allRecords];
 
     // Filter by product name
-    if (searchProduct.trim() !== '') {
-      filtered = filtered.filter(record =>
+    if (searchProduct.trim() !== "") {
+      filtered = filtered.filter((record) =>
         record.product?.toLowerCase().includes(searchProduct.toLowerCase())
       );
     }
 
     // Filter by date
-    if (filterDate !== '') {
-      filtered = filtered.filter(record => {
+    if (filterDate !== "") {
+      filtered = filtered.filter((record) => {
         const recordDate = new Date(record.updatedAt);
         const filterDateObj = new Date(filterDate);
         return (
@@ -235,7 +244,7 @@ export default function RecordsPage() {
     filtered.sort((a, b) => {
       const dateA = new Date(a.updatedAt);
       const dateB = new Date(b.updatedAt);
-      if (sortOrder === 'newest') {
+      if (sortOrder === "newest") {
         return dateB - dateA; // Newest first
       } else {
         return dateA - dateB; // Oldest first
@@ -250,35 +259,62 @@ export default function RecordsPage() {
     return (
       <div className="container">
         <div className="form-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px' }}>
-            <Link href="/" style={{ textDecoration: 'none', color: '#ff6b9d', fontSize: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255, 107, 157, 0.1)', transition: 'all 0.3s ease' }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "15px",
+              marginBottom: "20px",
+            }}
+          >
+            <Link
+              href="/"
+              style={{
+                textDecoration: "none",
+                color: "#ff6b9d",
+                fontSize: "24px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                background: "rgba(255, 107, 157, 0.1)",
+                transition: "all 0.3s ease",
+              }}
+            >
               ←
             </Link>
-            <h1 className="form-title" style={{ margin: 0 }}>Access Records</h1>
+            <h1 className="form-title" style={{ margin: 0 }}>
+              Access Records
+            </h1>
           </div>
-          <p style={{ color: '#666', marginTop: '10px', fontSize: '16px' }}>
+          <p style={{ color: "#666", marginTop: "10px", fontSize: "16px" }}>
             Please enter the password to view records
           </p>
         </div>
 
-        <form onSubmit={handlePasswordSubmit} style={{ maxWidth: '400px', margin: '40px auto' }}>
+        <form
+          onSubmit={handlePasswordSubmit}
+          style={{ maxWidth: "400px", margin: "40px auto" }}
+        >
           <div className="form-field">
             <label className="form-label">Password</label>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: "relative" }}>
               <input
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 className="form-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password..."
-                style={{ 
-                  padding: '12px 45px 12px 16px',
-                  borderBottom: 'none',
+                style={{
+                  padding: "12px 45px 12px 16px",
+                  borderBottom: "none",
                   borderBottomWidth: 0,
-                  borderBottomStyle: 'none',
-                  borderTop: '2px solid #ffe0e6',
-                  borderLeft: '2px solid #ffe0e6',
-                  borderRight: '2px solid #ffe0e6'
+                  borderBottomStyle: "none",
+                  borderTop: "2px solid #ffe0e6",
+                  borderLeft: "2px solid #ffe0e6",
+                  borderRight: "2px solid #ffe0e6",
                 }}
                 autoFocus
               />
@@ -286,35 +322,35 @@ export default function RecordsPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#ff6b9d',
-                  fontSize: '18px',
-                  padding: '5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '30px',
-                  height: '30px'
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#ff6b9d",
+                  fontSize: "18px",
+                  padding: "5px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "30px",
+                  height: "30px",
                 }}
-                title={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? '🙈' : '👁'}
+                {showPassword ? "🙈" : "👁"}
               </button>
             </div>
             {passwordError && (
-              <div className="field-error" style={{ marginTop: '8px' }}>
+              <div className="field-error" style={{ marginTop: "8px" }}>
                 {passwordError}
               </div>
             )}
           </div>
 
-          <div className="form-actions" >
+          <div className="form-actions">
             <button type="submit" className="submit-button">
               Access Records
             </button>
@@ -336,19 +372,34 @@ export default function RecordsPage() {
     <div className="container">
       <div className="form-header">
         <h1 className="form-title">Submitted Records</h1>
-        <div style={{ marginTop: '10px', color: '#666', fontSize: '14px' }}>
-          Access Level: <strong style={{ color: accessLevel === 'editor' ? '#ff6b9d' : '#c44569' }}>
-            {accessLevel === 'editor' ? 'Editor' : 'Viewer'}
+        <div style={{ marginTop: "10px", color: "#666", fontSize: "14px" }}>
+          Access Level:{" "}
+          <strong
+            style={{ color: accessLevel === "editor" ? "#ff6b9d" : "#c44569" }}
+          >
+            {accessLevel === "editor" ? "Editor" : "Viewer"}
           </strong>
         </div>
-        <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/" className="submit-button" style={{ textDecoration: 'none', display: 'inline-block' }}>
+        <div
+          style={{
+            marginTop: "20px",
+            display: "flex",
+            gap: "10px",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <Link
+            href="/"
+            className="submit-button"
+            style={{ textDecoration: "none", display: "inline-block" }}
+          >
             ← Back to Form
           </Link>
           <button
             onClick={fetchRecords}
             className="submit-button"
-            style={{ fontSize: '15px', padding: '12px 28px' }}
+            style={{ fontSize: "15px", padding: "12px 28px" }}
             title="Refresh records"
           >
             🔄 Refresh
@@ -357,21 +408,26 @@ export default function RecordsPage() {
       </div>
 
       {/* Filters and Search */}
-      <div style={{ 
-        marginBottom: '30px', 
-        padding: '25px', 
-        background: 'linear-gradient(135deg, rgba(255, 107, 157, 0.02) 0%, rgba(255, 207, 239, 0.05) 100%)',
-        borderRadius: '16px',
-        border: '2px solid #ffe0e6'
-      }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-          gap: '15px',
-          alignItems: 'end'
-        }}>
+      <div
+        style={{
+          marginBottom: "30px",
+          padding: "25px",
+          background:
+            "linear-gradient(135deg, rgba(255, 107, 157, 0.02) 0%, rgba(255, 207, 239, 0.05) 100%)",
+          borderRadius: "16px",
+          border: "2px solid #ffe0e6",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "15px",
+            alignItems: "end",
+          }}
+        >
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-label" style={{ marginBottom: '8px' }}>
+            <label className="form-label" style={{ marginBottom: "8px" }}>
               Search Product
             </label>
             <input
@@ -380,12 +436,12 @@ export default function RecordsPage() {
               value={searchProduct}
               onChange={(e) => setSearchProduct(e.target.value)}
               placeholder="Enter product name..."
-              style={{ padding: '12px 16px' }}
+              style={{ padding: "12px 16px" }}
             />
           </div>
 
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-label" style={{ marginBottom: '8px' }}>
+            <label className="form-label" style={{ marginBottom: "8px" }}>
               Filter by Date
             </label>
             <input
@@ -393,19 +449,19 @@ export default function RecordsPage() {
               className="form-input"
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              style={{ padding: '12px 16px' }}
+              style={{ padding: "12px 16px" }}
             />
           </div>
 
           <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-label" style={{ marginBottom: '8px' }}>
+            <label className="form-label" style={{ marginBottom: "8px" }}>
               Sort Order
             </label>
             <select
               className="form-input"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
-              style={{ padding: '12px 16px', cursor: 'pointer' }}
+              style={{ padding: "12px 16px", cursor: "pointer" }}
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -415,14 +471,14 @@ export default function RecordsPage() {
           {(searchProduct || filterDate) && (
             <button
               onClick={() => {
-                setSearchProduct('');
-                setFilterDate('');
+                setSearchProduct("");
+                setFilterDate("");
               }}
               className="clear-form"
-              style={{ 
-                padding: '12px 20px',
-                height: 'fit-content',
-                alignSelf: 'end'
+              style={{
+                padding: "12px 20px",
+                height: "fit-content",
+                alignSelf: "end",
               }}
             >
               Clear Filters
@@ -432,7 +488,7 @@ export default function RecordsPage() {
       </div>
 
       {records.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+        <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
           No submitted records yet. Submit a form to see records here.
         </div>
       ) : (
@@ -445,7 +501,7 @@ export default function RecordsPage() {
                   <th key={field.key}>{field.label}</th>
                 ))}
                 <th>Submitted At</th>
-                {accessLevel === 'editor' && <th>Actions</th>}
+                {accessLevel === "editor" && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -454,42 +510,58 @@ export default function RecordsPage() {
                   <td>{index + 1}</td>
                   {fields.map((field) => (
                     <td key={field.key}>
-                      {editingRecord === record._id && accessLevel === 'editor' ? (
+                      {editingRecord === record._id &&
+                      accessLevel === "editor" ? (
                         <input
-                          type={field.key === 'budget' ? 'number' : field.key === 'phone_number' ? 'tel' : 'text'}
-                          value={editFormData[field.key] || ''}
-                          onChange={(e) => handleEditFieldChange(field.key, e.target.value)}
+                          type={
+                            field.key === "budget"
+                              ? "number"
+                              : field.key === "phone_number"
+                              ? "tel"
+                              : "text"
+                          }
+                          value={editFormData[field.key] || ""}
+                          onChange={(e) =>
+                            handleEditFieldChange(field.key, e.target.value)
+                          }
                           className="form-input"
-                          style={{ 
-                            padding: '6px 10px', 
-                            fontSize: '13px', 
-                            width: '100%',
-                            minWidth: '100px'
+                          style={{
+                            padding: "6px 10px",
+                            fontSize: "13px",
+                            width: "100%",
+                            minWidth: "100px",
                           }}
                         />
                       ) : (
-                        record[field.key] || '-'
+                        record[field.key] || "-"
                       )}
                     </td>
                   ))}
                   <td>{formatDate(record.updatedAt)}</td>
-                  {accessLevel === 'editor' && (
+                  {accessLevel === "editor" && (
                     <td>
                       {editingRecord === record._id ? (
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center' }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
                           <button
                             onClick={() => handleSaveEdit(record._id)}
                             className="icon-button"
-                            style={{ 
-                              padding: '8px 12px', 
-                              fontSize: '16px',
-                              background: '#4caf50',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              color: 'white',
-                              transition: 'all 0.3s ease',
-                              fontWeight: 'bold'
+                            style={{
+                              padding: "8px 12px",
+                              fontSize: "16px",
+                              background: "#4caf50",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              color: "white",
+                              transition: "all 0.3s ease",
+                              fontWeight: "bold",
                             }}
                             title="Save"
                           >
@@ -498,16 +570,16 @@ export default function RecordsPage() {
                           <button
                             onClick={handleCancelEdit}
                             className="icon-button"
-                            style={{ 
-                              padding: '8px 12px', 
-                              fontSize: '16px',
-                              background: '#666',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              color: 'white',
-                              transition: 'all 0.3s ease',
-                              fontWeight: 'bold'
+                            style={{
+                              padding: "8px 12px",
+                              fontSize: "16px",
+                              background: "#666",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              color: "white",
+                              transition: "all 0.3s ease",
+                              fontWeight: "bold",
                             }}
                             title="Cancel"
                           >
@@ -515,20 +587,27 @@ export default function RecordsPage() {
                           </button>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center' }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
                           <button
                             onClick={() => handleEdit(record)}
                             className="icon-button"
-                            style={{ 
-                              padding: '8px 12px', 
-                              fontSize: '16px',
-                              background: '#ff9800',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              color: 'white',
-                              transition: 'all 0.3s ease',
-                              fontWeight: 'bold'
+                            style={{
+                              padding: "8px 12px",
+                              fontSize: "16px",
+                              background: "#ff9800",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              color: "white",
+                              transition: "all 0.3s ease",
+                              fontWeight: "bold",
                             }}
                             title="Edit"
                           >
@@ -537,16 +616,16 @@ export default function RecordsPage() {
                           <button
                             onClick={() => handleDeleteClick(record._id)}
                             className="icon-button"
-                            style={{ 
-                              padding: '8px 12px', 
-                              fontSize: '16px',
-                              background: '#f44336',
-                              border: 'none',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              color: 'white',
-                              transition: 'all 0.3s ease',
-                              fontWeight: 'bold'
+                            style={{
+                              padding: "8px 12px",
+                              fontSize: "16px",
+                              background: "#f44336",
+                              border: "none",
+                              borderRadius: "8px",
+                              cursor: "pointer",
+                              color: "white",
+                              transition: "all 0.3s ease",
+                              fontWeight: "bold",
                             }}
                             title="Delete"
                           >
@@ -563,15 +642,26 @@ export default function RecordsPage() {
         </div>
       )}
 
-      <div style={{ marginTop: '20px', textAlign: 'center', color: '#666', fontSize: '14px' }}>
+      <div
+        style={{
+          marginTop: "20px",
+          textAlign: "center",
+          color: "#666",
+          fontSize: "14px",
+        }}
+      >
         {searchProduct || filterDate ? (
           <>
-            Showing: <strong>{records.length}</strong> of <strong>{allRecords.length}</strong> records
+            Showing: <strong>{records.length}</strong> of{" "}
+            <strong>{allRecords.length}</strong> records
           </>
         ) : (
-          <>Total Records: <strong>{records.length}</strong> (from database: <strong>{allRecords.length}</strong>)</>
+          <>
+            Total Records: <strong>{records.length}</strong> (from database:{" "}
+            <strong>{allRecords.length}</strong>)
+          </>
         )}
-        <div style={{ marginTop: '5px', fontSize: '12px', color: '#999' }}>
+        <div style={{ marginTop: "5px", fontSize: "12px", color: "#999" }}>
           Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>
@@ -585,7 +675,7 @@ export default function RecordsPage() {
             </div>
             <div className="modal-body">
               <p>Are you sure you want to delete this record?</p>
-              <p style={{ color: '#666', fontSize: '14px', marginTop: '10px' }}>
+              <p style={{ color: "#666", fontSize: "14px", marginTop: "10px" }}>
                 This action cannot be undone.
               </p>
             </div>
@@ -609,4 +699,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-
